@@ -1,5 +1,5 @@
 name: Sync S3 Bucket
-on: push
+on:
   push:
     branches:
       - master
