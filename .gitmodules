@@ -1,0 +1,3 @@
+[submodule "themes/hugo-cell-score"]
+	path = themes/hugo-cell-score
+	url = https://github.com/BoyPlankton/hugo-cell-score.git
