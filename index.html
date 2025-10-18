@@ -6,8 +6,6 @@
     <title>AM01-ECHO-09 - Septi-Cycle History</title>
     <!-- Load Tailwind CSS for modern, responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Papa Parse for easy asynchronous CSV loading -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- Load D3.js for the custom Doughnut Chart and data visualization -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
@@ -118,7 +116,7 @@
         const RES_COLOR_HEX = '#0088FF'; // Bright Blue for RES wins
         const BASE_COLOR_HEX = '#F3F4F6'; // Light Gray (Tailwind gray-100) for low intensity / close scores
         const TIE_COLOR_HEX = '#CCCCCC'; // Gray for ties
-        const filePath = 'am01-echo-09.csv';
+        const DATA_FILE = 'am01-echo-09.json'; // JSON file instead of CSV
         
         // --- Color Utility Functions ---
         
@@ -306,15 +304,10 @@
                     .text(d.label);
 
                 // Calculate next starting position by estimating text width
-                // Note: getComputedTextLength() is not reliable in all environments, using a conservative estimate
                 const charWidthEstimate = 7; 
                 const textWidthEstimate = d.label.length * charWidthEstimate;
                 currentX += legendBoxSize + 5 + textWidthEstimate + legendSpacing;
             });
-            
-            // If the total width exceeds the view box, let the viewBox handle truncation/scaling.
-            // If you want precise centering, the currentX calculation needs to be more accurate.
-            // For now, we rely on the parent div's flex properties to center the SVG.
         }
         
         /**
@@ -380,38 +373,38 @@
         // --- Core Functions ---
 
         /**
-         * Fetches and parses the CSV file asynchronously using Papa Parse.
+         * Fetches and parses the JSON file asynchronously.
          */
         async function loadAndRenderHeatmap() {
             const container = document.getElementById('heatmap-container');
 
             try {
-                const response = await fetch(filePath);
+                const response = await fetch(DATA_FILE);
                 if (!response.ok) {
                     throw new Error(`Failed to load data: ${response.statusText}`);
                 }
-                const csvText = await response.text();
-
-                Papa.parse(csvText, {
-                    header: true,
-                    dynamicTyping: true, // Automatically convert numbers and booleans
-                    complete: function(results) {
-                        // Filter out rows with missing key data and ensure ENL/RES are numbers
-                        const rawData = results.data.filter(d => 
-                            d['ENL'] != null && typeof d['ENL'] === 'number' && 
-                            d['RES'] != null && typeof d['RES'] === 'number' && 
-                            d['Cycle'] != null && d['Year'] != null
-                        );
-                        if (rawData.length === 0) {
-                            container.innerHTML = '<p class="text-center text-red-500 p-8">Error: No valid data found in the CSV file.</p>';
-                            return;
-                        }
-                        processAndRender(rawData);
-                    },
-                    error: function(err, file) {
-                        throw new Error(`Error parsing CSV: ${err.message}`);
-                    }
-                });
+                
+                const rawData = await response.json();
+                
+                // Validate the data
+                if (!Array.isArray(rawData) || rawData.length === 0) {
+                    throw new Error('JSON data is not a valid array or is empty');
+                }
+                
+                // Filter out invalid rows
+                const cleanData = rawData.filter(d => 
+                    d.ENL != null && typeof d.ENL === 'number' && 
+                    d.RES != null && typeof d.RES === 'number' && 
+                    d.Cycle != null && d.Year != null &&
+                    d['Start Date'] != null
+                );
+                
+                if (cleanData.length === 0) {
+                    throw new Error('No valid data found in JSON file');
+                }
+                
+                processAndRender(cleanData);
+                
             } catch (error) {
                 console.error("Initialization Error:", error);
                 container.innerHTML = `<p class="text-center text-red-500 p-8">An error occurred: ${error.message}</p>`;
@@ -441,8 +434,8 @@
             const marginOfVictoryValues = [];
 
             data.forEach(item => {
-                const enl = item['ENL'];
-                const res = item['RES'];
+                const enl = item.ENL;
+                const res = item.RES;
 
                 // MU accumulation (assuming ENL and RES columns are MU)
                 totalEnlMU += enl || 0;
@@ -491,7 +484,7 @@
             
             // Group by Year
             const dataByYear = data.reduce((acc, item) => {
-                const year = item['Year'];
+                const year = item.Year;
                 if (year) {
                     if (!acc[year]) {
                         acc[year] = [];
@@ -505,7 +498,7 @@
 
             // Render the multi-row heatmap
             years.forEach(year => {
-                const yearData = dataByYear[year].sort((a, b) => a['Cycle'] - b['Cycle']); // Sort cycles numerically
+                const yearData = dataByYear[year].sort((a, b) => a.Cycle - b.Cycle);
 
                 // Container for the entire year section
                 const yearSection = document.createElement('div');
@@ -519,15 +512,14 @@
 
                 // Heatmap Cells Container - Responsive Grid (multiple rows)
                 const cellsContainer = document.createElement('div');
-                // Grid layout for responsiveness: 5 columns mobile, 8 tablet, 12 desktop
                 cellsContainer.className = 'grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-1.5 p-1';
 
                 yearData.forEach(item => {
                     const cell = document.createElement('div');
-                    const enl = item['ENL'];
-                    const res = item['RES'];
-                    const cycle = item['Cycle'];
-                    const startDate = item['Start Date']; // Cycle Start Date
+                    const enl = item.ENL;
+                    const res = item.RES;
+                    const cycle = item.Cycle;
+                    const startDate = item['Start Date'];
                     
                     const winner = enl > res ? 'ENL' : (res > enl ? 'RES' : 'TIE');
                     const margin = Math.abs(enl - res);
