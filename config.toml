@@ -1,9 +1,0 @@
-baseURL = 'https://am01-echo-09.com/'
-languageCode = 'en-us'
-title = 'AM01-ECHO-09'
-theme = "hugo-cell-score"
-
-[params]
-  description = "Historical cycle score data for am01-echo-09."
-  scoreCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vREpX1Vlm9nUcwT6Cjia3m9W7hD1xUbLT6E6sPFA39d1ySGIjPBJYcqe72x_n0IivIisztoVrg5-QXE/pub?gid=0&single=true&output=csv"
-

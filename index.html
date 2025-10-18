@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AM01-ECHO-09 - Septi-Cycle History</title>
+    <!-- Load Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Papa Parse for easy asynchronous CSV loading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Load D3.js for the custom Doughnut Chart and data visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Custom font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb; /* Light background */
+        }
+        /* Custom Tooltip Styling - makes it appear above the element */
+        .group:hover .tooltip {
+            opacity: 1;
+            display: block;
+            visibility: visible;
+        }
+        .tooltip {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        /* Custom styles for the grid items to ensure square aspect ratio */
+        .aspect-square {
+            aspect-ratio: 1 / 1;
+        }
+        /* D3 text styles for center text */
+        .d3-center-label {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700; /* bold */
+            font-size: 16px;
+            fill: #4B5563; /* gray-600 */
+        }
+        .d3-center-value {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800; /* extrabold */
+            font-size: 24px;
+            fill: #1F2937; /* gray-800 */
+        }
+        /* D3 legend text styles */
+        .d3-legend-text {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600; /* semibold */
+            font-size: 12px;
+            fill: #4B5563; /* gray-600 */
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-indigo-900 tracking-tight">
+                AM01-ECHO-09
+            </h1>
+            <p class="mt-2 text-lg text-gray-500">
+                Historical overview of the Ingress septi-cycles for AM01-ECHO-09.
+            </p>
+        </header>
+
+        <!-- Summary Metrics and Chart Container (New Section) -->
+        <div id="summary-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            
+            <!-- 1. Cycle Wins Chart (Doughnut - Now D3) -->
+            <div id="cycle-wins-chart-container" class="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center justify-center col-span-1">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">Total Cycle Wins Distribution</h2>
+                <!-- D3 SVG will be appended here -->
+                <div id="d3-chart-area" class="w-full max-w-[300px] aspect-square flex justify-center items-center">
+                    <!-- SVG for Pie Chart goes here -->
+                </div>
+                <!-- D3 Legend will be appended here -->
+                <div id="d3-legend-area" class="w-full mt-4 flex justify-center">
+                    <!-- SVG for Legend goes here -->
+                </div>
+            </div>
+            
+            <!-- 2 & 3. Metrics Cards (Longest Streak & Cumulative MU) -->
+            <div id="metrics-container" class="md:col-span-2 space-y-6">
+                <!-- Longest Streak -->
+                <div id="longest-streak-card"></div>
+                <!-- Cumulative MU -->
+                <div id="cumulative-mu-card"></div>
+            </div>
+        </div>
+
+        <!-- Legend Container -->
+        <div id="legend-container" class="mb-10">
+            <!-- Legend will be rendered here by JavaScript -->
+        </div>
+
+        <!-- Heatmap Title -->
+        <h2 class="text-2xl font-bold text-gray-700 mt-8 mb-4">Margin of Victory Heatmap</h2>
+
+        <!-- Heatmap Container -->
+        <div id="heatmap-container" class="space-y-6">
+            <div class="text-center p-8 bg-white rounded-xl shadow-lg">
+                <p class="text-gray-500 font-semibold">Loading cycle data...</p>
+                <div class="mt-4 flex justify-center space-x-2">
+                    <div class="w-4 h-4 bg-indigo-500 rounded-full animate-bounce"></div>
+                    <div class="w-4 h-4 bg-indigo-500 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                    <div class="w-4 h-4 bg-indigo-500 rounded-full animate-bounce" style="animation-delay: 0.4s;"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const ENL_COLOR_HEX = '#03DC03'; // Bright Green for ENL wins
+        const RES_COLOR_HEX = '#0088FF'; // Bright Blue for RES wins
+        const BASE_COLOR_HEX = '#F3F4F6'; // Light Gray (Tailwind gray-100) for low intensity / close scores
+        const TIE_COLOR_HEX = '#CCCCCC'; // Gray for ties
+        const filePath = 'am01-echo-09.csv';
+        
+        // --- Color Utility Functions ---
+        
+        /** Converts a hex color string to an RGB array [r, g, b]. */
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return [r, g, b];
+        }
+
+        /** Linearly interpolates (blends) two colors based on a factor (0.0 to 1.0). */
+        function interpolateColor(color1Hex, color2Hex, factor) {
+            const c1 = hexToRgb(color1Hex);
+            const c2 = hexToRgb(color2Hex);
+            
+            // Factor is clamped between 0 and 1
+            const f = Math.max(0, Math.min(1, factor));
+
+            const r = Math.round(c1[0] + (c2[0] - c1[0]) * f);
+            const g = Math.round(c1[1] + (c2[1] - c1[1]) * f);
+            const b = Math.round(c1[2] + (c2[2] - c1[2]) * f);
+
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        /** Helper to format large numbers (e.g., 1,234,567 -> 1.2M) */
+        const formatMU = (num) => {
+            if (num === 0) return '0';
+            const absNum = Math.abs(num);
+            if (absNum >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            }
+            if (absNum >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toLocaleString();
+        };
+
+
+        // --- Chart Rendering (D3.js Implementation) ---
+        
+        /**
+         * Renders the Doughnut chart for total cycle wins using D3.js.
+         */
+        function renderCycleWinsChart(wins) {
+            const chartArea = d3.select('#d3-chart-area');
+            const legendArea = d3.select('#d3-legend-area');
+            
+            // Clear existing chart and legend
+            chartArea.selectAll('*').remove();
+            legendArea.selectAll('*').remove();
+
+            const totalWins = wins.enl + wins.res + wins.tie;
+            const data = [
+                { faction: 'ENL Wins', count: wins.enl, color: ENL_COLOR_HEX, label: `ENL Wins (${wins.enl})` },
+                { faction: 'RES Wins', count: wins.res, color: RES_COLOR_HEX, label: `RES Wins (${wins.res})` },
+                { faction: 'Ties', count: wins.tie, color: TIE_COLOR_HEX, label: `Ties (${wins.tie})` }
+            ];
+
+            // --- SVG and Dimensions Setup ---
+            const width = 300,
+                  height = 300,
+                  margin = 10;
+            
+            const radius = Math.min(width, height) / 2 - margin;
+            const innerRadius = radius * 0.7; // Doughnut size
+            const outerRadius = radius;
+
+            // Append SVG to the chart area
+            const svg = chartArea.append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .append("g")
+                .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+            // --- Pie and Arc Generators ---
+
+            const pie = d3.pie()
+                .sort(null) // Do not sort slices
+                .value(d => d.count);
+
+            const arc = d3.arc()
+                .innerRadius(innerRadius)
+                .outerRadius(outerRadius);
+                
+            const hoverArc = d3.arc()
+                .innerRadius(innerRadius)
+                .outerRadius(outerRadius + 8); // Slightly larger on hover
+
+            // --- Drawing the Slices ---
+            const arcs = svg.selectAll(".arc")
+                .data(pie(data.filter(d => d.count > 0))) // Filter out zero-value slices
+                .enter()
+                .append("g")
+                .attr("class", "arc");
+
+            arcs.append("path")
+                .attr("d", arc)
+                .attr("fill", d => d.data.color)
+                .attr("stroke", "#ffffff")
+                .style("stroke-width", "3px")
+                .on("mouseover", function(event, d) {
+                    d3.select(this)
+                        .transition()
+                        .duration(150)
+                        .attr("d", hoverArc)
+                        .style("filter", "drop-shadow(0 4px 6px rgba(0,0,0,0.1))");
+                    
+                    // Show Tooltip-like details in the center
+                    d3.select("#center-text-label")
+                        .text(d.data.faction);
+                    d3.select("#center-text-value")
+                        .text(`${d.data.count} (${totalWins > 0 ? (d.data.count / totalWins * 100).toFixed(1) + '%' : '0%'})`);
+                })
+                .on("mouseout", function(event, d) {
+                    d3.select(this)
+                        .transition()
+                        .duration(150)
+                        .attr("d", arc)
+                        .style("filter", "none");
+                    
+                    // Reset center text
+                    d3.select("#center-text-label")
+                        .text("Total Cycles");
+                    d3.select("#center-text-value")
+                        .text(totalWins);
+                });
+
+            // --- Center Text (Total Count) ---
+            
+            // Group for center text
+            const centerTextGroup = svg.append("g")
+                .attr("class", "center-text pointer-events-none")
+                .attr("text-anchor", "middle");
+
+            // Total Cycles Label
+            centerTextGroup.append("text")
+                .attr("id", "center-text-label")
+                .attr("class", "d3-center-label")
+                .attr("dy", "-0.5em")
+                .text("Total Cycles");
+            
+            // Total Count Value
+            centerTextGroup.append("text")
+                .attr("id", "center-text-value")
+                .attr("class", "d3-center-value")
+                .attr("dy", "1em")
+                .text(totalWins);
+                
+            // --- External Legend ---
+            
+            const legendData = data.filter(d => d.count > 0);
+            
+            const legendSVGWidth = 300;
+            const legendHeight = 20;
+            const legendSpacing = 15;
+            const legendBoxSize = 10;
+
+            const legendSVG = legendArea.append("svg")
+                .attr("viewBox", `0 0 ${legendSVGWidth} ${legendHeight}`)
+                .attr("preserveAspectRatio", "xMidYMin meet")
+                .attr("class", "max-w-xs")
+                .append("g");
+                
+            let currentX = 0;
+            legendData.forEach((d, i) => {
+                const legendItem = legendSVG.append("g")
+                    .attr("transform", `translate(${currentX}, 0)`);
+
+                // Color box
+                legendItem.append("rect")
+                    .attr("width", legendBoxSize)
+                    .attr("height", legendBoxSize)
+                    .attr("fill", d.color)
+                    .attr("rx", 2);
+
+                // Text label
+                legendItem.append("text")
+                    .attr("x", legendBoxSize + 5)
+                    .attr("y", legendBoxSize / 2)
+                    .attr("dy", "0.3em")
+                    .attr("class", "d3-legend-text")
+                    .text(d.label);
+
+                // Calculate next starting position by estimating text width
+                // Note: getComputedTextLength() is not reliable in all environments, using a conservative estimate
+                const charWidthEstimate = 7; 
+                const textWidthEstimate = d.label.length * charWidthEstimate;
+                currentX += legendBoxSize + 5 + textWidthEstimate + legendSpacing;
+            });
+            
+            // If the total width exceeds the view box, let the viewBox handle truncation/scaling.
+            // If you want precise centering, the currentX calculation needs to be more accurate.
+            // For now, we rely on the parent div's flex properties to center the SVG.
+        }
+        
+        /**
+         * Renders the Longest Streak and Cumulative MU cards.
+         */
+        function renderSummaryMetrics(metrics) {
+            const streakCard = document.getElementById('longest-streak-card');
+            const muCard = document.getElementById('cumulative-mu-card');
+
+            // --- Longest Streak Card ---
+            streakCard.className = 'bg-white p-6 rounded-xl shadow-lg border-l-4 border-gray-200';
+            streakCard.innerHTML = `
+                <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                    Longest Cycle Win Streaks
+                    <span class="ml-2 text-xs font-medium text-gray-400">(Cycles Won Consecutively)</span>
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center p-3 rounded-lg bg-green-50 border-2 border-green-200 transition-shadow duration-300 hover:shadow-md">
+                        <p class="text-xs font-semibold uppercase text-green-600">ENL Streak</p>
+                        <p class="text-3xl font-extrabold text-green-800 mt-1">${metrics.enlStreak}</p>
+                        <p class="text-sm text-gray-500">Cycles</p>
+                    </div>
+                    <div class="text-center p-3 rounded-lg bg-blue-50 border-2 border-blue-200 transition-shadow duration-300 hover:shadow-md">
+                        <p class="text-xs font-semibold uppercase text-blue-600">RES Streak</p>
+                        <p class="text-3xl font-extrabold text-blue-800 mt-1">${metrics.resStreak}</p>
+                        <p class="text-sm text-gray-500">Cycles</p>
+                    </div>
+                </div>
+            `;
+
+            // --- Cumulative MU Card ---
+            const totalMU = metrics.enlMU + metrics.resMU;
+            const enlPercent = totalMU > 0 ? (metrics.enlMU / totalMU) * 100 : 0;
+            const resPercent = totalMU > 0 ? (metrics.resMU / totalMU) * 100 : 0;
+            
+            muCard.className = 'bg-white p-6 rounded-xl shadow-lg border-l-4 border-gray-200';
+            muCard.innerHTML = `
+                <h3 class="text-lg font-bold text-gray-700 mb-4">Cumulative Total Mind Units (MU)</h3>
+                
+                <!-- Progress Bar -->
+                <div class="h-4 rounded-full overflow-hidden mb-4 shadow-inner">
+                    <div class="h-full flex" style="width: 100%;">
+                        <div class="h-full bg-green-500 transition-all duration-500" style="width: ${enlPercent.toFixed(2)}%;"></div>
+                        <div class="h-full bg-blue-500 transition-all duration-500" style="width: ${resPercent.toFixed(2)}%;"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="p-2 rounded-lg bg-green-50">
+                        <p class="text-xs font-semibold uppercase text-green-700">ENL Total</p>
+                        <p class="text-2xl font-bold text-green-900">${formatMU(metrics.enlMU)}</p>
+                        <p class="text-sm text-gray-500">(${enlPercent.toFixed(1)}%)</p>
+                    </div>
+                    <div class="p-2 rounded-lg bg-blue-50">
+                        <p class="text-xs font-semibold uppercase text-blue-700">RES Total</p>
+                        <p class="text-2xl font-bold text-blue-900">${formatMU(metrics.resMU)}</p>
+                        <p class="text-sm text-gray-500">(${resPercent.toFixed(1)}%)</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Core Functions ---
+
+        /**
+         * Fetches and parses the CSV file asynchronously using Papa Parse.
+         */
+        async function loadAndRenderHeatmap() {
+            const container = document.getElementById('heatmap-container');
+
+            try {
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error(`Failed to load data: ${response.statusText}`);
+                }
+                const csvText = await response.text();
+
+                Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true, // Automatically convert numbers and booleans
+                    complete: function(results) {
+                        // Filter out rows with missing key data and ensure ENL/RES are numbers
+                        const rawData = results.data.filter(d => 
+                            d['ENL'] != null && typeof d['ENL'] === 'number' && 
+                            d['RES'] != null && typeof d['RES'] === 'number' && 
+                            d['Cycle'] != null && d['Year'] != null
+                        );
+                        if (rawData.length === 0) {
+                            container.innerHTML = '<p class="text-center text-red-500 p-8">Error: No valid data found in the CSV file.</p>';
+                            return;
+                        }
+                        processAndRender(rawData);
+                    },
+                    error: function(err, file) {
+                        throw new Error(`Error parsing CSV: ${err.message}`);
+                    }
+                });
+            } catch (error) {
+                console.error("Initialization Error:", error);
+                container.innerHTML = `<p class="text-center text-red-500 p-8">An error occurred: ${error.message}</p>`;
+            }
+        }
+
+        /**
+         * Processes the cleaned data, calculates all metrics, and renders all components.
+         * @param {Array<Object>} data - Array of cycle data objects.
+         */
+        function processAndRender(data) {
+            const container = document.getElementById('heatmap-container');
+            container.innerHTML = ''; // Clear loading indicator
+
+            // 1. Calculate Summary Metrics and Max MOV
+            let enlWins = 0;
+            let resWins = 0;
+            let ties = 0;
+            let totalEnlMU = 0;
+            let totalResMU = 0;
+
+            let longestEnlStreak = 0;
+            let currentEnlStreak = 0;
+            let longestResStreak = 0;
+            let currentResStreak = 0;
+
+            const marginOfVictoryValues = [];
+
+            data.forEach(item => {
+                const enl = item['ENL'];
+                const res = item['RES'];
+
+                // MU accumulation (assuming ENL and RES columns are MU)
+                totalEnlMU += enl || 0;
+                totalResMU += res || 0;
+
+                // Determine Winner for wins count and streak calculation
+                if (enl > res) {
+                    enlWins++;
+                    currentEnlStreak++;
+                    longestResStreak = Math.max(longestResStreak, currentResStreak);
+                    currentResStreak = 0;
+                } else if (res > enl) {
+                    resWins++;
+                    currentResStreak++;
+                    longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
+                    currentEnlStreak = 0;
+                } else {
+                    ties++;
+                    longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
+                    longestResStreak = Math.max(longestResStreak, currentResStreak);
+                    currentEnlStreak = 0;
+                    currentResStreak = 0;
+                }
+
+                // Margin of Victory for Heatmap scaling
+                marginOfVictoryValues.push(Math.abs(enl - res));
+            });
+
+            // Final check for streaks if the data ended on a win
+            longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
+            longestResStreak = Math.max(longestResStreak, currentResStreak);
+
+            const maxMOV = Math.max(...marginOfVictoryValues);
+
+            // 2. Render Summary Components
+            renderCycleWinsChart({ enl: enlWins, res: resWins, tie: ties });
+            renderSummaryMetrics({ 
+                enlMU: totalEnlMU, 
+                resMU: totalResMU, 
+                enlStreak: longestEnlStreak, 
+                resStreak: longestResStreak 
+            });
+
+
+            // 3. Render Heatmap (existing logic)
+            
+            // Group by Year
+            const dataByYear = data.reduce((acc, item) => {
+                const year = item['Year'];
+                if (year) {
+                    if (!acc[year]) {
+                        acc[year] = [];
+                    }
+                    acc[year].push(item);
+                }
+                return acc;
+            }, {});
+
+            const years = Object.keys(dataByYear).sort();
+
+            // Render the multi-row heatmap
+            years.forEach(year => {
+                const yearData = dataByYear[year].sort((a, b) => a['Cycle'] - b['Cycle']); // Sort cycles numerically
+
+                // Container for the entire year section
+                const yearSection = document.createElement('div');
+                yearSection.className = 'w-full p-4 bg-white rounded-xl shadow-lg transition-transform duration-300 hover:shadow-2xl';
+
+                // Year Header
+                const yearHeader = document.createElement('h3');
+                yearHeader.className = 'text-xl font-bold text-gray-700 mb-4 pb-2 border-b border-gray-100';
+                yearHeader.textContent = `${year}`;
+                yearSection.appendChild(yearHeader);
+
+                // Heatmap Cells Container - Responsive Grid (multiple rows)
+                const cellsContainer = document.createElement('div');
+                // Grid layout for responsiveness: 5 columns mobile, 8 tablet, 12 desktop
+                cellsContainer.className = 'grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-1.5 p-1';
+
+                yearData.forEach(item => {
+                    const cell = document.createElement('div');
+                    const enl = item['ENL'];
+                    const res = item['RES'];
+                    const cycle = item['Cycle'];
+                    const startDate = item['Start Date']; // Cycle Start Date
+                    
+                    const winner = enl > res ? 'ENL' : (res > enl ? 'RES' : 'TIE');
+                    const margin = Math.abs(enl - res);
+
+                    let intensityFactor = 0;
+                    let targetColor = BASE_COLOR_HEX;
+
+                    if (winner !== 'TIE' && maxMOV > 0) {
+                        // Intensity based on margin of victory relative to the overall max margin
+                        intensityFactor = margin / maxMOV;
+                        targetColor = winner === 'ENL' ? ENL_COLOR_HEX : RES_COLOR_HEX;
+                    } else if (winner === 'TIE') {
+                        targetColor = TIE_COLOR_HEX;
+                        intensityFactor = 0.5; // Ensure ties have a recognizable light gray color
+                    }
+
+                    // Get the final background color using interpolation
+                    const finalColor = interpolateColor(BASE_COLOR_HEX, targetColor, intensityFactor);
+
+                    // Cell styling and content
+                    cell.className = 'aspect-square rounded-md transition-all duration-150 ease-in-out shadow-sm hover:shadow-lg cursor-pointer relative group flex items-center justify-center';
+                    cell.style.backgroundColor = finalColor;
+                    
+                    // Tooltip data
+                    const tooltipText = 
+                        `Cycle ${cycle} (${year})\n` +
+                        `Start Date: ${startDate}\n` +
+                        `Winner: ${winner}\n` +
+                        `ENL: ${enl.toLocaleString()}\n` +
+                        `RES: ${res.toLocaleString()}`;
+
+                    // Tooltip implementation (pure CSS hover + JS content)
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip absolute z-50 bottom-full mb-3 p-3 text-xs font-medium text-white bg-gray-900 rounded-lg shadow-2xl whitespace-pre-wrap transform -translate-x-1/2 left-1/2 pointer-events-none';
+                    tooltip.textContent = tooltipText;
+                    cell.appendChild(tooltip);
+
+                    // Add a tiny circle to represent the cycle
+                    const dot = document.createElement('div');
+                    dot.className = 'w-1 h-1 bg-gray-900 rounded-full opacity-50 group-hover:opacity-100 transition-opacity';
+                    cell.appendChild(dot);
+
+                    cellsContainer.appendChild(cell);
+                });
+
+                yearSection.appendChild(cellsContainer);
+                container.appendChild(yearSection);
+            });
+
+            // Render the color legend
+            renderLegend(maxMOV);
+        }
+
+        /**
+         * Renders the color intensity legend.
+         */
+        function renderLegend(maxMOV) {
+            const legendContainer = document.getElementById('legend-container');
+            legendContainer.innerHTML = ''; // Clear previous content
+
+            const card = document.createElement('div');
+            card.className = 'w-full max-w-xl mx-auto p-4 bg-white rounded-xl shadow-inner border border-gray-100';
+            
+            const title = document.createElement('h3');
+            title.className = 'text-base font-semibold text-gray-700 mb-2';
+            title.textContent = 'Cycle Winner & Margin of Victory';
+            card.appendChild(title);
+
+            // Two Gradient Bars (ENL and RES)
+            const legendBarsContainer = document.createElement('div');
+            legendBarsContainer.className = 'grid grid-cols-2 gap-4';
+
+            // --- ENL Legend Bar ---
+            const enlBar = createGradientBar('ENL Win', ENL_COLOR_HEX, 'ENL');
+            legendBarsContainer.appendChild(enlBar);
+
+            // --- RES Legend Bar ---
+            const resBar = createGradientBar('RES Win', RES_COLOR_HEX, 'RES');
+            legendBarsContainer.appendChild(resBar);
+
+            card.appendChild(legendBarsContainer);
+
+            // Labels for Margin
+            const labels = document.createElement('div');
+            labels.className = 'flex justify-between text-sm text-gray-600 font-medium mt-2 pt-2 border-t border-gray-100';
+
+            const lowLabel = document.createElement('span');
+            lowLabel.textContent = `Close Battle (~0 MOV / Tie)`;
+            labels.appendChild(lowLabel);
+
+            const maxLabel = document.createElement('span');
+            maxLabel.textContent = `Blowout (${maxMOV.toLocaleString()} MOV)`;
+            labels.appendChild(maxLabel);
+
+            card.appendChild(labels);
+            legendContainer.appendChild(card);
+        }
+        
+        /** Helper function to create a gradient bar element */
+        function createGradientBar(title, targetColor, faction) {
+            const barContainer = document.createElement('div');
+            barContainer.className = 'flex flex-col';
+
+            const barTitle = document.createElement('p');
+            barTitle.className = `text-sm font-bold mb-1 ${faction === 'ENL' ? 'text-green-600' : 'text-blue-600'}`;
+            barTitle.textContent = title;
+            barContainer.appendChild(barTitle);
+
+            const gradientBar = document.createElement('div');
+            gradientBar.className = 'h-5 rounded-md';
+            // Create a CSS linear gradient using the base and target hex codes
+            gradientBar.style.background = `linear-gradient(to right, ${BASE_COLOR_HEX}, ${targetColor})`;
+            barContainer.appendChild(gradientBar);
+            
+            return barContainer;
+        }
+
+        // Initialize the application when the window loads
+        window.onload = loadAndRenderHeatmap;
+    </script>
+</body>
+</html>
