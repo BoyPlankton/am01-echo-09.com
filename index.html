@@ -3,642 +3,1296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>AM01-ECHO-09 - Septi-Cycle History</title>
-    <!-- Load Tailwind CSS for modern, responsive styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load D3.js for the custom Doughnut Chart and data visualization -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="icon" href="favicon.ico" sizes="any">
     <style>
-        /* Custom font */
+        :root {
+            color-scheme: light dark;
+            --bg: #f4f8fd;
+            --bg-secondary: #dde9f8;
+            --surface: rgba(255, 255, 255, 0.82);
+            --surface-strong: #ffffff;
+            --surface-muted: #edf3fa;
+            --text: #122034;
+            --muted: #566477;
+            --muted-strong: #3e4f64;
+            --border: rgba(18, 32, 52, 0.12);
+            --shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            --shadow-soft: 0 12px 28px rgba(15, 23, 42, 0.08);
+            --focus: rgba(0, 136, 255, 0.3);
+            --enl: #03dc03;
+            --res: #0088ff;
+            --enl-1: #def7de;
+            --enl-2: #b9efb9;
+            --enl-3: #83e883;
+            --enl-4: #41e141;
+            --enl-5: #03dc03;
+            --res-1: #d9ecff;
+            --res-2: #add5ff;
+            --res-3: #73b9ff;
+            --res-4: #2f9cff;
+            --res-5: #0088ff;
+            --tie-1: #d8dee8;
+            --track: #dbe6f1;
+            --cell-size: 1rem;
+            --graph-gap: 0.36rem;
+            --radius: 22px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #08111b;
+                --bg-secondary: #102031;
+                --surface: rgba(10, 18, 31, 0.92);
+                --surface-strong: #13253a;
+                --surface-muted: #16293f;
+                --text: #f4f8ff;
+                --muted: #bfd0e3;
+                --muted-strong: #d7e3f0;
+                --border: rgba(204, 220, 240, 0.2);
+                --shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+                --shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.28);
+                --focus: rgba(3, 220, 3, 0.28);
+                --enl-1: #18491a;
+                --enl-2: #1d631f;
+                --enl-3: #227f25;
+                --enl-4: #28a32c;
+                --enl-5: #03dc03;
+                --res-1: #17324a;
+                --res-2: #1c4970;
+                --res-3: #25699e;
+                --res-4: #2585dd;
+                --res-5: #0088ff;
+                --tie-1: #5a6c81;
+                --track: #314761;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        .cv-auto {
+            content-visibility: auto;
+            contain-intrinsic-size: 560px;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb; /* Light background */
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Avenir Next", "Segoe UI Variable", "SF Pro Display", "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(0, 136, 255, 0.17), transparent 28%),
+                radial-gradient(circle at top right, rgba(3, 220, 3, 0.14), transparent 22%),
+                linear-gradient(180deg, var(--bg) 0%, var(--bg-secondary) 100%);
         }
-        /* Custom Tooltip Styling - makes it appear above the element */
-        .group:hover .tooltip {
-            opacity: 1;
+
+        button,
+        input,
+        textarea,
+        select {
+            font: inherit;
+        }
+
+        .site-shell {
+            width: min(1180px, calc(100vw - 2rem));
+            margin: 0 auto;
+            padding: 1.5rem 0 3rem;
+        }
+
+        .page-header,
+        .panel,
+        .matrix-panel {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(16px);
+        }
+
+        .page-header {
+            display: grid;
+            gap: 1.5rem;
+            padding: clamp(1.25rem, 3vw, 2rem);
+            margin-bottom: 1.5rem;
+            contain-intrinsic-size: 240px;
+        }
+
+        .eyebrow {
+            margin: 0 0 0.5rem;
+            color: var(--res);
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        h1,
+        h2,
+        h3,
+        p {
+            margin: 0;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 4.5vw, 4rem);
+            line-height: 0.95;
+            letter-spacing: -0.04em;
+        }
+
+        .lede {
+            margin-top: 0.85rem;
+            color: var(--muted-strong);
+            font-size: 1rem;
+            line-height: 1.65;
+        }
+
+        .header-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.72rem 0.95rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        .dot {
+            width: 0.72rem;
+            height: 0.72rem;
+            border-radius: 999px;
+            flex: 0 0 auto;
+        }
+
+        .dot.enl {
+            background: var(--enl);
+            box-shadow: 0 0 0 5px color-mix(in srgb, var(--enl) 18%, transparent);
+        }
+
+        .dot.res {
+            background: var(--res);
+            box-shadow: 0 0 0 5px color-mix(in srgb, var(--res) 18%, transparent);
+        }
+
+        .summary-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1.15fr 1fr;
+            margin-bottom: 1rem;
+        }
+
+        .summary-stack {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .panel {
+            padding: 1.35rem;
+        }
+
+        .panel-skeleton {
+            min-height: 18rem;
+        }
+
+        .panel-skeleton::after {
+            content: "";
             display: block;
-            visibility: visible;
+            min-height: 100%;
+            border-radius: calc(var(--radius) - 6px);
+            background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface-strong) 28%, transparent), transparent);
+            opacity: 0.45;
         }
-        .tooltip {
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .panel-caption {
+            color: var(--muted-strong);
+            font-size: 0.9rem;
+        }
+
+        .chart-wrap {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 1rem;
+            align-content: start;
+        }
+
+        .chart-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: minmax(220px, 300px) 1fr;
+            align-items: center;
+        }
+
+        .chart-svg {
+            width: min(100%, 300px);
+            height: auto;
+            justify-self: center;
+            overflow: visible;
+        }
+
+        .chart-track {
+            fill: none;
+            stroke: var(--track);
+            stroke-width: 16;
+        }
+
+        .chart-slice {
+            fill: none;
+            stroke-width: 16;
+            stroke-linecap: butt;
+        }
+
+        .chart-label {
+            fill: var(--muted-strong);
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .chart-value {
+            fill: var(--text);
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .chart-legend {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .legend-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.8rem 0.95rem;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
+        }
+
+        .legend-item strong {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.7rem;
+            font-size: 0.95rem;
+        }
+
+        .legend-swatch {
+            width: 0.92rem;
+            height: 0.92rem;
+            border-radius: 0.28rem;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .legend-swatch.enl {
+            background: var(--enl-5);
+        }
+
+        .legend-swatch.res {
+            background: var(--res-5);
+        }
+
+        .legend-swatch.tie {
+            background: var(--tie-1);
+        }
+
+        .metric-grid,
+        .mu-grid {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .legend-scales {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: 1fr;
+            width: 100%;
+        }
+
+        .stat-box {
+            padding: 1rem;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface-strong) 84%, transparent);
+        }
+
+        .stat-box.enl-box {
+            background: color-mix(in srgb, var(--enl-1) 75%, var(--surface-strong));
+        }
+
+        .stat-box.res-box {
+            background: color-mix(in srgb, var(--res-1) 75%, var(--surface-strong));
+        }
+
+        .stat-label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            display: block;
+            margin-top: 0.4rem;
+            font-size: clamp(1.85rem, 3vw, 2.5rem);
+            font-weight: 900;
+            letter-spacing: -0.04em;
+        }
+
+        .stat-subtext {
+            margin-top: 0.2rem;
+            color: var(--muted-strong);
+            font-size: 0.9rem;
+        }
+
+        .mu-bar {
+            height: 0.92rem;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--track);
+        }
+
+        .mu-bar-track {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .mu-segment.enl-segment {
+            background: linear-gradient(90deg, var(--enl-3), var(--enl-5));
+        }
+
+        .mu-segment.res-segment {
+            background: linear-gradient(90deg, var(--res-3), var(--res-5));
+        }
+
+        .section-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 1rem;
+            margin: 1.5rem 0 1rem;
+        }
+
+        .section-heading p {
+            max-width: 62ch;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .legend-panel {
+            margin-bottom: 1.25rem;
+        }
+
+        .legend-copy {
+            margin-bottom: 1rem;
+            color: var(--muted);
+            line-height: 1.6;
+            width: 100%;
+        }
+
+        .scale-row {
+            display: grid;
+            gap: 0.65rem;
+        }
+
+        .scale-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.92rem;
+            font-weight: 800;
+        }
+
+        .scale-label.centered {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+        }
+
+        .scale-label.centered span:nth-child(2) {
+            justify-self: center;
+        }
+
+        .scale-label.centered span:last-child {
+            justify-self: end;
+        }
+
+        .scale-track {
+            display: grid;
+            gap: 0.45rem;
+            grid-template-columns: repeat(11, minmax(0, 1fr));
+        }
+
+        .scale-cell {
+            height: 1.2rem;
+            border-radius: 0.45rem;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .scale-cell.close {
+            background: color-mix(in srgb, var(--surface-muted) 94%, white 6%);
+        }
+
+        .heatmap-sections {
+            content-visibility: auto;
+            contain-intrinsic-size: 1200px;
+        }
+
+        .matrix-panel {
+            display: grid;
+            gap: 1rem;
+            padding: 1.1rem 1.1rem 1.2rem;
+            content-visibility: auto;
+            contain-intrinsic-size: 540px;
+        }
+
+        .matrix-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .matrix-kicker {
+            margin-bottom: 0.25rem;
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .matrix-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+        }
+
+        .matrix-meta,
+        .year-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .matrix-badge,
+        .year-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.45rem 0.7rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
+        }
+
+        .matrix-scroll {
+            overflow-x: auto;
+            padding-bottom: 0.15rem;
+        }
+
+        .heatmap-matrix {
+            width: 100%;
+            min-width: 980px;
+            border-collapse: separate;
+            border-spacing: var(--graph-gap);
+            table-layout: fixed;
+        }
+
+        .heatmap-matrix th,
+        .heatmap-matrix td {
+            padding: 0;
+            vertical-align: middle;
+        }
+
+        .matrix-axis-label,
+        .matrix-year-label {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            width: 4.6rem;
+            min-width: 4.6rem;
+            padding-right: 0.5rem;
+            background: color-mix(in srgb, var(--surface) 96%, transparent);
+            color: var(--muted-strong);
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-align: left;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .matrix-axis-label {
+            font-size: 0.72rem;
+        }
+
+        .matrix-cycle-label {
+            width: var(--cell-size);
+            min-width: var(--cell-size);
+            color: var(--muted-strong);
+            font-size: 0.62rem;
+            font-weight: 800;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .matrix-data-cell {
+            width: var(--cell-size);
+            min-width: var(--cell-size);
+        }
+
+        .matrix-cycle-label > span[aria-hidden="true"] {
+            display: inline-block;
+            width: 100%;
+            text-align: center;
+        }
+
+        .heatmap-cell,
+        .empty-cell {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 0.3rem;
+        }
+
+        .heatmap-cell {
+            appearance: none;
+            position: relative;
+            padding: 0;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--surface-muted);
+            cursor: pointer;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+            transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+        }
+
+        .heatmap-cell:hover,
+        .heatmap-cell:focus-visible {
+            transform: translateY(-1px) scale(1.08);
+            box-shadow: 0 10px 18px rgba(0, 0, 0, 0.18);
+            border-color: rgba(255, 255, 255, 0.26);
+            outline: none;
+        }
+
+        .heatmap-cell:focus-visible {
+            box-shadow: 0 0 0 4px var(--focus), 0 10px 18px rgba(0, 0, 0, 0.18);
+        }
+
+        .heatmap-tooltip {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 0.45rem);
+            z-index: 6;
+            min-width: 11rem;
+            padding: 0.6rem 0.72rem;
+            border-radius: 0.7rem;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface-strong) 96%, transparent);
+            color: var(--text);
+            box-shadow: var(--shadow-soft);
+            text-align: left;
+            white-space: nowrap;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
+            transform: translateX(-50%) translateY(0.25rem);
+            transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+            pointer-events: none;
         }
-        /* Custom styles for the grid items to ensure square aspect ratio */
-        .aspect-square {
-            aspect-ratio: 1 / 1;
+
+        .heatmap-tooltip::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            width: 0.65rem;
+            height: 0.65rem;
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface-strong) 96%, transparent);
+            transform: translateX(-50%) rotate(45deg);
         }
-        /* D3 text styles for center text */
-        .d3-center-label {
-            font-family: 'Inter', sans-serif;
-            font-weight: 700; /* bold */
-            font-size: 16px;
-            fill: #4B5563; /* gray-600 */
+
+        .heatmap-tooltip strong,
+        .heatmap-tooltip span {
+            display: block;
         }
-        .d3-center-value {
-            font-family: 'Inter', sans-serif;
-            font-weight: 800; /* extrabold */
-            font-size: 24px;
-            fill: #1F2937; /* gray-800 */
+
+        .heatmap-tooltip strong {
+            font-size: 0.76rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
-        /* D3 legend text styles */
-        .d3-legend-text {
-            font-family: 'Inter', sans-serif;
-            font-weight: 600; /* semibold */
-            font-size: 12px;
-            fill: #4B5563; /* gray-600 */
+
+        .heatmap-tooltip span {
+            margin-top: 0.18rem;
+            color: var(--muted-strong);
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .heatmap-cell:hover .heatmap-tooltip,
+        .heatmap-cell:focus-visible .heatmap-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .winner-enl.level-1 { background: var(--enl-1); }
+        .winner-enl.level-2 { background: var(--enl-2); }
+        .winner-enl.level-3 { background: var(--enl-3); }
+        .winner-enl.level-4 { background: var(--enl-4); }
+        .winner-enl.level-5 { background: var(--enl-5); }
+
+        .winner-res.level-1 { background: var(--res-1); }
+        .winner-res.level-2 { background: var(--res-2); }
+        .winner-res.level-3 { background: var(--res-3); }
+        .winner-res.level-4 { background: var(--res-4); }
+        .winner-res.level-5 { background: var(--res-5); }
+
+        .winner-tie {
+            background: var(--tie-1);
+        }
+
+        .empty-cell {
+            border: 1px dashed rgba(255, 255, 255, 0.08);
+            background: color-mix(in srgb, var(--surface-muted) 84%, transparent);
+            opacity: 0.52;
+        }
+
+        .loading-state,
+        .error-state,
+        .noscript-state {
+            display: grid;
+            gap: 0.7rem;
+            justify-items: center;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            background: color-mix(in srgb, var(--surface-strong) 84%, transparent);
+        }
+
+        .loading-bars {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .loading-bars span {
+            width: 0.5rem;
+            height: 1rem;
+            border-radius: 999px;
+            background: linear-gradient(180deg, var(--res), var(--enl));
+            animation: bounce 1s ease-in-out infinite;
+        }
+
+        .loading-bars span:nth-child(2) { animation-delay: 0.12s; }
+        .loading-bars span:nth-child(3) { animation-delay: 0.24s; }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+            40% { transform: translateY(-0.35rem); opacity: 1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+
+            .heatmap-cell:hover,
+            .heatmap-cell:focus-visible {
+                transform: none;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .summary-grid,
+            .chart-grid,
+            .metric-grid,
+            .mu-grid,
+            .legend-scales {
+                grid-template-columns: 1fr;
+            }
+
+            .section-heading {
+                align-items: start;
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 640px) {
+            :root {
+                --cell-size: 0.92rem;
+                --graph-gap: 0.3rem;
+            }
+
+            .site-shell {
+                width: min(100vw - 1rem, 1180px);
+                padding-top: 0.75rem;
+            }
+
+            .page-header,
+            .panel,
+            .matrix-panel {
+                border-radius: 18px;
+            }
+
+            .heatmap-matrix {
+                min-width: 760px;
+            }
+
+            .matrix-axis-label,
+            .matrix-year-label {
+                width: 3.5rem;
+            }
+
+            .heatmap-tooltip {
+                min-width: 9.5rem;
+                white-space: normal;
+            }
         }
     </style>
 </head>
-<body class="p-4 sm:p-8">
-
-    <div class="max-w-7xl mx-auto">
-        <header class="text-center mb-10">
-            <h1 class="text-3xl sm:text-4xl font-extrabold text-indigo-900 tracking-tight">
-                AM01-ECHO-09
-            </h1>
-            <p class="mt-2 text-lg text-gray-500">
-                Historical overview of the Ingress septi-cycles for AM01-ECHO-09.
-            </p>
+<body>
+    <main class="site-shell">
+        <header class="page-header cv-auto">
+            <div>
+                <h1>AM01-ECHO-09</h1>
+                <p class="lede">Historical overview of Ingress septi-cycles for AM01-ECHO-09</p>
+            </div>
         </header>
 
-        <!-- Summary Metrics and Chart Container (New Section) -->
-        <div id="summary-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            
-            <!-- 1. Cycle Wins Chart (Doughnut - Now D3) -->
-            <div id="cycle-wins-chart-container" class="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center justify-center col-span-1">
-                <h2 class="text-lg font-bold text-gray-800 mb-4">Total Cycle Wins Distribution</h2>
-                <!-- D3 SVG will be appended here -->
-                <div id="d3-chart-area" class="w-full max-w-[300px] aspect-square flex justify-center items-center">
-                    <!-- SVG for Pie Chart goes here -->
+        <section class="summary-grid cv-auto" aria-label="Septi-cycle summary">
+            <article class="panel chart-wrap" id="cycle-wins-chart-container">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Total Cycle Wins Distribution</h2>
+                        <p class="panel-caption">Faction win share across all recorded septi-cycles.</p>
+                    </div>
                 </div>
-                <!-- D3 Legend will be appended here -->
-                <div id="d3-legend-area" class="w-full mt-4 flex justify-center">
-                    <!-- SVG for Legend goes here -->
-                </div>
+                <div id="d3-chart-area" class="panel-skeleton" aria-busy="true"></div>
+            </article>
+
+            <div class="summary-stack" id="metrics-container">
+                <article class="panel panel-skeleton" id="longest-streak-card" aria-busy="true"></article>
+                <article class="panel panel-skeleton" id="cumulative-mu-card" aria-busy="true"></article>
             </div>
-            
-            <!-- 2 & 3. Metrics Cards (Longest Streak & Cumulative MU) -->
-            <div id="metrics-container" class="md:col-span-2 space-y-6">
-                <!-- Longest Streak -->
-                <div id="longest-streak-card"></div>
-                <!-- Cumulative MU -->
-                <div id="cumulative-mu-card"></div>
-            </div>
-        </div>
+        </section>
 
-        <!-- Legend Container -->
-        <div id="legend-container" class="mb-10">
-            <!-- Legend will be rendered here by JavaScript -->
-        </div>
-
-        <!-- Heatmap Title -->
-        <h2 class="text-2xl font-bold text-gray-700 mt-8 mb-4">Margin of Victory Heatmap</h2>
-
-        <!-- Heatmap Container -->
-        <div id="heatmap-container" class="space-y-6">
-            <div class="text-center p-8 bg-white rounded-xl shadow-lg">
-                <p class="text-gray-500 font-semibold">Loading cycle data...</p>
-                <div class="mt-4 flex justify-center space-x-2">
-                    <div class="w-4 h-4 bg-indigo-500 rounded-full animate-bounce"></div>
-                    <div class="w-4 h-4 bg-indigo-500 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
-                    <div class="w-4 h-4 bg-indigo-500 rounded-full animate-bounce" style="animation-delay: 0.4s;"></div>
+        <section class="cv-auto">
+            <div id="heatmap-container" class="heatmap-sections">
+                <div class="loading-state" aria-live="polite">
+                    <p>Loading cycle data…</p>
+                    <div class="loading-bars" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-    </div>
+        <noscript>
+            <section class="noscript-state">
+                <p>This page uses JavaScript to build the year heatmaps and summary cards.</p>
+            </section>
+        </noscript>
+    </main>
 
     <script>
-        // --- Configuration ---
-        const ENL_COLOR_HEX = '#03DC03'; // Bright Green for ENL wins
-        const RES_COLOR_HEX = '#0088FF'; // Bright Blue for RES wins
-        const BASE_COLOR_HEX = '#F3F4F6'; // Light Gray (Tailwind gray-100) for low intensity / close scores
-        const TIE_COLOR_HEX = '#CCCCCC'; // Gray for ties
-        const DATA_FILE = 'am01-echo-09.json'; // JSON file instead of CSV
-        
-        // --- Color Utility Functions ---
-        
-        /** Converts a hex color string to an RGB array [r, g, b]. */
-        function hexToRgb(hex) {
-            const bigint = parseInt(hex.slice(1), 16);
-            const r = (bigint >> 16) & 255;
-            const g = (bigint >> 8) & 255;
-            const b = bigint & 255;
-            return [r, g, b];
-        }
+        const DATA_FILE = 'am01-echo-09.json';
+        const TOTAL_CYCLES = 51;
+        const numberFormatter = new Intl.NumberFormat('en-US');
+        const dateFormatter = new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
 
-        /** Linearly interpolates (blends) two colors based on a factor (0.0 to 1.0). */
-        function interpolateColor(color1Hex, color2Hex, factor) {
-            const c1 = hexToRgb(color1Hex);
-            const c2 = hexToRgb(color2Hex);
-            
-            // Factor is clamped between 0 and 1
-            const f = Math.max(0, Math.min(1, factor));
-
-            const r = Math.round(c1[0] + (c2[0] - c1[0]) * f);
-            const g = Math.round(c1[1] + (c2[1] - c1[1]) * f);
-            const b = Math.round(c1[2] + (c2[2] - c1[2]) * f);
-
-            return `rgb(${r}, ${g}, ${b})`;
-        }
-        
-        /** Helper to format large numbers (e.g., 1,234,567 -> 1.2M) */
-        const formatMU = (num) => {
-            if (num === 0) return '0';
-            const absNum = Math.abs(num);
-            if (absNum >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
+        const formatCompactNumber = (value) => {
+            if (value === 0) {
+                return '0';
             }
-            if (absNum >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
+
+            const absValue = Math.abs(value);
+            if (absValue >= 1000000) {
+                return `${(value / 1000000).toFixed(1)}M`;
             }
-            return num.toLocaleString();
+            if (absValue >= 1000) {
+                return `${(value / 1000).toFixed(1)}K`;
+            }
+            return numberFormatter.format(value);
         };
 
+        const escapeHtml = (value) => String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
 
-        // --- Chart Rendering (D3.js Implementation) ---
-        
-        /**
-         * Renders the Doughnut chart for total cycle wins using D3.js.
-         */
-        function renderCycleWinsChart(wins) {
-            const chartArea = d3.select('#d3-chart-area');
-            const legendArea = d3.select('#d3-legend-area');
-            
-            // Clear existing chart and legend
-            chartArea.selectAll('*').remove();
-            legendArea.selectAll('*').remove();
+        function normalizeRow(row) {
+            const startDate = new Date(row?.['Start Date']);
 
-            const totalWins = wins.enl + wins.res + wins.tie;
-            const data = [
-                { faction: 'ENL Wins', count: wins.enl, color: ENL_COLOR_HEX, label: `ENL Wins (${wins.enl})` },
-                { faction: 'RES Wins', count: wins.res, color: RES_COLOR_HEX, label: `RES Wins (${wins.res})` },
-                { faction: 'Ties', count: wins.tie, color: TIE_COLOR_HEX, label: `Ties (${wins.tie})` }
-            ];
+            if (
+                !Number.isFinite(row?.ENL)
+                || !Number.isFinite(row?.RES)
+                || !Number.isFinite(row?.Cycle)
+                || !Number.isFinite(row?.Year)
+                || Number.isNaN(startDate.getTime())
+            ) {
+                return null;
+            }
 
-            // --- SVG and Dimensions Setup ---
-            const width = 300,
-                  height = 300,
-                  margin = 10;
-            
-            const radius = Math.min(width, height) / 2 - margin;
-            const innerRadius = radius * 0.7; // Doughnut size
-            const outerRadius = radius;
+            return {
+                year: row.Year,
+                cycle: row.Cycle,
+                enl: row.ENL,
+                res: row.RES,
+                startDate
+            };
+        }
 
-            // Append SVG to the chart area
-            const svg = chartArea.append("svg")
-                .attr("viewBox", `0 0 ${width} ${height}`)
-                .attr("preserveAspectRatio", "xMidYMid meet")
-                .append("g")
-                .attr("transform", `translate(${width / 2}, ${height / 2})`);
-
-            // --- Pie and Arc Generators ---
-
-            const pie = d3.pie()
-                .sort(null) // Do not sort slices
-                .value(d => d.count);
-
-            const arc = d3.arc()
-                .innerRadius(innerRadius)
-                .outerRadius(outerRadius);
-                
-            const hoverArc = d3.arc()
-                .innerRadius(innerRadius)
-                .outerRadius(outerRadius + 8); // Slightly larger on hover
-
-            // --- Drawing the Slices ---
-            const arcs = svg.selectAll(".arc")
-                .data(pie(data.filter(d => d.count > 0))) // Filter out zero-value slices
-                .enter()
-                .append("g")
-                .attr("class", "arc");
-
-            arcs.append("path")
-                .attr("d", arc)
-                .attr("fill", d => d.data.color)
-                .attr("stroke", "#ffffff")
-                .style("stroke-width", "3px")
-                .on("mouseover", function(event, d) {
-                    d3.select(this)
-                        .transition()
-                        .duration(150)
-                        .attr("d", hoverArc)
-                        .style("filter", "drop-shadow(0 4px 6px rgba(0,0,0,0.1))");
-                    
-                    // Show Tooltip-like details in the center
-                    d3.select("#center-text-label")
-                        .text(d.data.faction);
-                    d3.select("#center-text-value")
-                        .text(`${d.data.count} (${totalWins > 0 ? (d.data.count / totalWins * 100).toFixed(1) + '%' : '0%'})`);
-                })
-                .on("mouseout", function(event, d) {
-                    d3.select(this)
-                        .transition()
-                        .duration(150)
-                        .attr("d", arc)
-                        .style("filter", "none");
-                    
-                    // Reset center text
-                    d3.select("#center-text-label")
-                        .text("Total Cycles");
-                    d3.select("#center-text-value")
-                        .text(totalWins);
-                });
-
-            // --- Center Text (Total Count) ---
-            
-            // Group for center text
-            const centerTextGroup = svg.append("g")
-                .attr("class", "center-text pointer-events-none")
-                .attr("text-anchor", "middle");
-
-            // Total Cycles Label
-            centerTextGroup.append("text")
-                .attr("id", "center-text-label")
-                .attr("class", "d3-center-label")
-                .attr("dy", "-0.5em")
-                .text("Total Cycles");
-            
-            // Total Count Value
-            centerTextGroup.append("text")
-                .attr("id", "center-text-value")
-                .attr("class", "d3-center-value")
-                .attr("dy", "1em")
-                .text(totalWins);
-                
-            // --- External Legend ---
-            
-            const legendData = data.filter(d => d.count > 0);
-            
-            const legendSVGWidth = 300;
-            const legendHeight = 20;
-            const legendSpacing = 15;
-            const legendBoxSize = 10;
-
-            const legendSVG = legendArea.append("svg")
-                .attr("viewBox", `0 0 ${legendSVGWidth} ${legendHeight}`)
-                .attr("preserveAspectRatio", "xMidYMin meet")
-                .attr("class", "max-w-xs")
-                .append("g");
-                
-            let currentX = 0;
-            legendData.forEach((d, i) => {
-                const legendItem = legendSVG.append("g")
-                    .attr("transform", `translate(${currentX}, 0)`);
-
-                // Color box
-                legendItem.append("rect")
-                    .attr("width", legendBoxSize)
-                    .attr("height", legendBoxSize)
-                    .attr("fill", d.color)
-                    .attr("rx", 2);
-
-                // Text label
-                legendItem.append("text")
-                    .attr("x", legendBoxSize + 5)
-                    .attr("y", legendBoxSize / 2)
-                    .attr("dy", "0.3em")
-                    .attr("class", "d3-legend-text")
-                    .text(d.label);
-
-                // Calculate next starting position by estimating text width
-                const charWidthEstimate = 7; 
-                const textWidthEstimate = d.label.length * charWidthEstimate;
-                currentX += legendBoxSize + 5 + textWidthEstimate + legendSpacing;
+        function clearBusyState(...elements) {
+            elements.filter(Boolean).forEach((element) => {
+                element.classList.remove('panel-skeleton');
+                element.removeAttribute('aria-busy');
             });
         }
-        
-        /**
-         * Renders the Longest Streak and Cumulative MU cards.
-         */
-        function renderSummaryMetrics(metrics) {
-            const streakCard = document.getElementById('longest-streak-card');
-            const muCard = document.getElementById('cumulative-mu-card');
 
-            // --- Longest Streak Card ---
-            streakCard.className = 'bg-white p-6 rounded-xl shadow-lg border-l-4 border-gray-200';
-            streakCard.innerHTML = `
-                <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                    Longest Cycle Win Streaks
-                    <span class="ml-2 text-xs font-medium text-gray-400">(Cycles Won Consecutively)</span>
-                </h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="text-center p-3 rounded-lg bg-green-50 border-2 border-green-200 transition-shadow duration-300 hover:shadow-md">
-                        <p class="text-xs font-semibold uppercase text-green-600">ENL Streak</p>
-                        <p class="text-3xl font-extrabold text-green-800 mt-1">${metrics.enlStreak}</p>
-                        <p class="text-sm text-gray-500">Cycles</p>
-                    </div>
-                    <div class="text-center p-3 rounded-lg bg-blue-50 border-2 border-blue-200 transition-shadow duration-300 hover:shadow-md">
-                        <p class="text-xs font-semibold uppercase text-blue-600">RES Streak</p>
-                        <p class="text-3xl font-extrabold text-blue-800 mt-1">${metrics.resStreak}</p>
-                        <p class="text-sm text-gray-500">Cycles</p>
-                    </div>
-                </div>
-            `;
-
-            // --- Cumulative MU Card ---
-            const totalMU = metrics.enlMU + metrics.resMU;
-            const enlPercent = totalMU > 0 ? (metrics.enlMU / totalMU) * 100 : 0;
-            const resPercent = totalMU > 0 ? (metrics.resMU / totalMU) * 100 : 0;
-            
-            muCard.className = 'bg-white p-6 rounded-xl shadow-lg border-l-4 border-gray-200';
-            muCard.innerHTML = `
-                <h3 class="text-lg font-bold text-gray-700 mb-4">Cumulative Total Mind Units (MU)</h3>
-                
-                <!-- Progress Bar -->
-                <div class="h-4 rounded-full overflow-hidden mb-4 shadow-inner">
-                    <div class="h-full flex" style="width: 100%;">
-                        <div class="h-full bg-green-500 transition-all duration-500" style="width: ${enlPercent.toFixed(2)}%;"></div>
-                        <div class="h-full bg-blue-500 transition-all duration-500" style="width: ${resPercent.toFixed(2)}%;"></div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4 text-center">
-                    <div class="p-2 rounded-lg bg-green-50">
-                        <p class="text-xs font-semibold uppercase text-green-700">ENL Total</p>
-                        <p class="text-2xl font-bold text-green-900">${formatMU(metrics.enlMU)}</p>
-                        <p class="text-sm text-gray-500">(${enlPercent.toFixed(1)}%)</p>
-                    </div>
-                    <div class="p-2 rounded-lg bg-blue-50">
-                        <p class="text-xs font-semibold uppercase text-blue-700">RES Total</p>
-                        <p class="text-2xl font-bold text-blue-900">${formatMU(metrics.resMU)}</p>
-                        <p class="text-sm text-gray-500">(${resPercent.toFixed(1)}%)</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        // --- Core Functions ---
-
-        /**
-         * Fetches and parses the JSON file asynchronously.
-         */
-        async function loadAndRenderHeatmap() {
-            const container = document.getElementById('heatmap-container');
-
-            try {
-                const response = await fetch(DATA_FILE);
-                if (!response.ok) {
-                    throw new Error(`Failed to load data: ${response.statusText}`);
-                }
-                
-                const rawData = await response.json();
-                
-                // Validate the data
-                if (!Array.isArray(rawData) || rawData.length === 0) {
-                    throw new Error('JSON data is not a valid array or is empty');
-                }
-                
-                // Filter out invalid rows
-                const cleanData = rawData.filter(d => 
-                    d.ENL != null && typeof d.ENL === 'number' && 
-                    d.RES != null && typeof d.RES === 'number' && 
-                    d.Cycle != null && d.Year != null &&
-                    d['Start Date'] != null
-                );
-                
-                if (cleanData.length === 0) {
-                    throw new Error('No valid data found in JSON file');
-                }
-                
-                processAndRender(cleanData);
-                
-            } catch (error) {
-                console.error("Initialization Error:", error);
-                container.innerHTML = `<p class="text-center text-red-500 p-8">An error occurred: ${error.message}</p>`;
+        function getWinner(enl, res) {
+            if (enl > res) {
+                return 'ENL';
             }
+            if (res > enl) {
+                return 'RES';
+            }
+            return 'TIE';
         }
 
-        /**
-         * Processes the cleaned data, calculates all metrics, and renders all components.
-         * @param {Array<Object>} data - Array of cycle data objects.
-         */
-        function processAndRender(data) {
-            const container = document.getElementById('heatmap-container');
-            container.innerHTML = ''; // Clear loading indicator
+        function getIntensityLevel(margin, maxMOV) {
+            if (!margin || maxMOV <= 0) {
+                return 0;
+            }
 
-            // 1. Calculate Summary Metrics and Max MOV
+            const normalized = margin / maxMOV;
+            const exponential = (Math.exp(normalized * 1.35) - 1) / (Math.exp(1.35) - 1);
+            return Math.max(1, Math.min(5, Math.ceil(exponential * 5)));
+        }
+
+        function createTooltipText(cycle) {
+            const winnerLabel = cycle.winner === 'TIE' ? 'Tie' : cycle.winner;
+            const date = dateFormatter.format(cycle.startDate);
+            return [
+                `${cycle.year} · Cycle ${cycle.cycle}`,
+                `${date}`,
+                `Winner: ${winnerLabel}`,
+                `MOV: ${numberFormatter.format(cycle.margin)}`,
+                `ENL: ${numberFormatter.format(cycle.enl)}`,
+                `RES: ${numberFormatter.format(cycle.res)}`
+            ].join('\n');
+        }
+
+        function createTooltipMarkup(cycle) {
+            const winnerLabel = cycle.winner === 'TIE' ? 'Tie' : cycle.winner;
+            const date = dateFormatter.format(cycle.startDate);
+            return `
+                <span class="heatmap-tooltip" aria-hidden="true">
+                    <strong>${cycle.year} · Cycle ${cycle.cycle}</strong>
+                    <span>${date}</span>
+                    <span>${winnerLabel} by ${numberFormatter.format(cycle.margin)} MU</span>
+                    <span>ENL ${numberFormatter.format(cycle.enl)} · RES ${numberFormatter.format(cycle.res)}</span>
+                </span>`;
+        }
+
+        function processData(data) {
+            const cleanData = data
+                .map(normalizeRow)
+                .filter(Boolean)
+                .sort((a, b) => a.year - b.year || a.cycle - b.cycle);
+
+            if (!cleanData.length) {
+                throw new Error('No valid cycle rows were found in the JSON data.');
+            }
+
+            const margins = cleanData.map((row) => Math.abs(row.enl - row.res));
+            const maxMOV = Math.max(...margins, 0);
+
             let enlWins = 0;
             let resWins = 0;
             let ties = 0;
             let totalEnlMU = 0;
             let totalResMU = 0;
-
             let longestEnlStreak = 0;
-            let currentEnlStreak = 0;
             let longestResStreak = 0;
+            let currentEnlStreak = 0;
             let currentResStreak = 0;
 
-            const marginOfVictoryValues = [];
+            const cycles = cleanData.map((row) => {
+                const winner = getWinner(row.enl, row.res);
+                const margin = Math.abs(row.enl - row.res);
+                const intensityLevel = winner === 'TIE' ? 0 : getIntensityLevel(margin, maxMOV);
 
-            data.forEach(item => {
-                const enl = item.ENL;
-                const res = item.RES;
+                totalEnlMU += row.enl;
+                totalResMU += row.res;
 
-                // MU accumulation (assuming ENL and RES columns are MU)
-                totalEnlMU += enl || 0;
-                totalResMU += res || 0;
-
-                // Determine Winner for wins count and streak calculation
-                if (enl > res) {
-                    enlWins++;
-                    currentEnlStreak++;
+                if (winner === 'ENL') {
+                    enlWins += 1;
+                    currentEnlStreak += 1;
                     longestResStreak = Math.max(longestResStreak, currentResStreak);
                     currentResStreak = 0;
-                } else if (res > enl) {
-                    resWins++;
-                    currentResStreak++;
+                } else if (winner === 'RES') {
+                    resWins += 1;
+                    currentResStreak += 1;
                     longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
                     currentEnlStreak = 0;
                 } else {
-                    ties++;
+                    ties += 1;
                     longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
                     longestResStreak = Math.max(longestResStreak, currentResStreak);
                     currentEnlStreak = 0;
                     currentResStreak = 0;
                 }
 
-                // Margin of Victory for Heatmap scaling
-                marginOfVictoryValues.push(Math.abs(enl - res));
+                return {
+                    year: row.year,
+                    cycle: row.cycle,
+                    enl: row.enl,
+                    res: row.res,
+                    startDate: row.startDate,
+                    winner,
+                    margin,
+                    intensityLevel
+                };
             });
 
-            // Final check for streaks if the data ended on a win
             longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
             longestResStreak = Math.max(longestResStreak, currentResStreak);
 
-            const maxMOV = Math.max(...marginOfVictoryValues);
-
-            // 2. Render Summary Components
-            renderCycleWinsChart({ enl: enlWins, res: resWins, tie: ties });
-            renderSummaryMetrics({ 
-                enlMU: totalEnlMU, 
-                resMU: totalResMU, 
-                enlStreak: longestEnlStreak, 
-                resStreak: longestResStreak 
+            const yearsMap = new Map();
+            cycles.forEach((cycle) => {
+                if (!yearsMap.has(cycle.year)) {
+                    yearsMap.set(cycle.year, []);
+                }
+                yearsMap.get(cycle.year).push(cycle);
             });
 
-
-            // 3. Render Heatmap (existing logic)
-            
-            // Group by Year
-            const dataByYear = data.reduce((acc, item) => {
-                const year = item.Year;
-                if (year) {
-                    if (!acc[year]) {
-                        acc[year] = [];
-                    }
-                    acc[year].push(item);
-                }
-                return acc;
-            }, {});
-
-            const years = Object.keys(dataByYear).sort();
-
-            // Render the multi-row heatmap
-            years.forEach(year => {
-                const yearData = dataByYear[year].sort((a, b) => a.Cycle - b.Cycle);
-
-                // Container for the entire year section
-                const yearSection = document.createElement('div');
-                yearSection.className = 'w-full p-4 bg-white rounded-xl shadow-lg transition-transform duration-300 hover:shadow-2xl';
-
-                // Year Header
-                const yearHeader = document.createElement('h3');
-                yearHeader.className = 'text-xl font-bold text-gray-700 mb-4 pb-2 border-b border-gray-100';
-                yearHeader.textContent = `${year}`;
-                yearSection.appendChild(yearHeader);
-
-                // Heatmap Cells Container - Responsive Grid (multiple rows)
-                const cellsContainer = document.createElement('div');
-                cellsContainer.className = 'grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-1.5 p-1';
-
-                yearData.forEach(item => {
-                    const cell = document.createElement('div');
-                    const enl = item.ENL;
-                    const res = item.RES;
-                    const cycle = item.Cycle;
-                    const startDate = item['Start Date'];
-                    
-                    const winner = enl > res ? 'ENL' : (res > enl ? 'RES' : 'TIE');
-                    const margin = Math.abs(enl - res);
-
-                    let intensityFactor = 0;
-                    let targetColor = BASE_COLOR_HEX;
-
-                    if (winner !== 'TIE' && maxMOV > 0) {
-                        // Intensity based on margin of victory relative to the overall max margin
-                        intensityFactor = margin / maxMOV;
-                        targetColor = winner === 'ENL' ? ENL_COLOR_HEX : RES_COLOR_HEX;
-                    } else if (winner === 'TIE') {
-                        targetColor = TIE_COLOR_HEX;
-                        intensityFactor = 0.5; // Ensure ties have a recognizable light gray color
-                    }
-
-                    // Get the final background color using interpolation
-                    const finalColor = interpolateColor(BASE_COLOR_HEX, targetColor, intensityFactor);
-
-                    // Cell styling and content
-                    cell.className = 'aspect-square rounded-md transition-all duration-150 ease-in-out shadow-sm hover:shadow-lg cursor-pointer relative group flex items-center justify-center';
-                    cell.style.backgroundColor = finalColor;
-                    
-                    // Tooltip data
-                    const tooltipText = 
-                        `Cycle ${cycle} (${year})\n` +
-                        `Start Date: ${startDate}\n` +
-                        `Winner: ${winner}\n` +
-                        `ENL: ${enl.toLocaleString()}\n` +
-                        `RES: ${res.toLocaleString()}`;
-
-                    // Tooltip implementation (pure CSS hover + JS content)
-                    const tooltip = document.createElement('div');
-                    tooltip.className = 'tooltip absolute z-50 bottom-full mb-3 p-3 text-xs font-medium text-white bg-gray-900 rounded-lg shadow-2xl whitespace-pre-wrap transform -translate-x-1/2 left-1/2 pointer-events-none';
-                    tooltip.textContent = tooltipText;
-                    cell.appendChild(tooltip);
-
-                    // Add a tiny circle to represent the cycle
-                    const dot = document.createElement('div');
-                    dot.className = 'w-1 h-1 bg-gray-900 rounded-full opacity-50 group-hover:opacity-100 transition-opacity';
-                    cell.appendChild(dot);
-
-                    cellsContainer.appendChild(cell);
+            const years = Array.from(yearsMap.entries())
+                .sort((a, b) => b[0] - a[0])
+                .map(([year, yearCycles]) => {
+                    const cycleLookup = new Map(yearCycles.map((cycle) => [cycle.cycle, cycle]));
+                    return {
+                        year,
+                        cycles: yearCycles,
+                        cycleLookup
+                    };
                 });
 
-                yearSection.appendChild(cellsContainer);
-                container.appendChild(yearSection);
-            });
-
-            // Render the color legend
-            renderLegend(maxMOV);
+            return {
+                maxMOV,
+                years,
+                summary: {
+                    totalCycles: cycles.length,
+                    enlWins,
+                    resWins,
+                    ties,
+                    totalEnlMU,
+                    totalResMU,
+                    longestEnlStreak,
+                    longestResStreak
+                }
+            };
         }
 
-        /**
-         * Renders the color intensity legend.
-         */
+        function renderCycleWinsChart(summary) {
+            const container = document.getElementById('d3-chart-area');
+            const totalWins = summary.totalCycles;
+            const chartData = [
+                { label: 'ENL Wins', count: summary.enlWins, color: 'var(--enl-5)', swatchClass: 'enl' },
+                { label: 'RES Wins', count: summary.resWins, color: 'var(--res-5)', swatchClass: 'res' },
+                { label: 'Ties', count: summary.ties, color: 'var(--tie-1)', swatchClass: 'tie' }
+            ].filter((item) => item.count > 0);
+
+            if (!totalWins) {
+                container.innerHTML = '<p class="panel-caption">No cycle results available.</p>';
+                return;
+            }
+
+            const radius = 52;
+            const circumference = 2 * Math.PI * radius;
+            let accumulated = 0;
+
+            const slices = chartData.map((item) => {
+                const dash = (item.count / totalWins) * circumference;
+                const circle = `
+                    <circle
+                        class="chart-slice"
+                        cx="64"
+                        cy="64"
+                        r="${radius}"
+                        stroke="${item.color}"
+                        stroke-dasharray="${dash.toFixed(2)} ${circumference.toFixed(2)}"
+                        stroke-dashoffset="${(-accumulated).toFixed(2)}"></circle>`;
+                accumulated += dash;
+                return circle;
+            }).join('');
+
+            const legend = chartData.map((item) => {
+                const percentage = ((item.count / totalWins) * 100).toFixed(1);
+                return `
+                    <div class="legend-item">
+                        <strong><span class="legend-swatch ${item.swatchClass}" aria-hidden="true"></span>${escapeHtml(item.label)}</strong>
+                        <span>${numberFormatter.format(item.count)} · ${percentage}%</span>
+                    </div>`;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="chart-grid">
+                    <svg class="chart-svg" viewBox="0 0 128 128" role="img" aria-label="Cycle win distribution doughnut chart">
+                        <g transform="rotate(-90 64 64)">
+                            <circle class="chart-track" cx="64" cy="64" r="${radius}"></circle>
+                            ${slices}
+                        </g>
+                        <text class="chart-label" x="64" y="56" text-anchor="middle">Total Cycles</text>
+                        <text class="chart-value" x="64" y="73" text-anchor="middle">${numberFormatter.format(totalWins)}</text>
+                    </svg>
+                    <div class="chart-legend">${legend}</div>
+                </div>`;
+
+                    clearBusyState(container);
+        }
+
+        function renderSummaryMetrics(summary) {
+            const streakCard = document.getElementById('longest-streak-card');
+            const muCard = document.getElementById('cumulative-mu-card');
+
+            streakCard.innerHTML = `
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Longest Win Streaks</h2>
+                        <p class="panel-caption">Most consecutive septi-cycles won by each faction.</p>
+                    </div>
+                </div>
+                <div class="metric-grid">
+                    <section class="stat-box enl-box" aria-label="Enlightened longest streak">
+                        <span class="stat-label">ENL Streak</span>
+                        <span class="stat-value">${numberFormatter.format(summary.longestEnlStreak)}</span>
+                        <p class="stat-subtext">cycles</p>
+                    </section>
+                    <section class="stat-box res-box" aria-label="Resistance longest streak">
+                        <span class="stat-label">RES Streak</span>
+                        <span class="stat-value">${numberFormatter.format(summary.longestResStreak)}</span>
+                        <p class="stat-subtext">cycles</p>
+                    </section>
+                </div>`;
+
+            clearBusyState(streakCard);
+
+            const totalMU = summary.totalEnlMU + summary.totalResMU;
+            const enlPercent = totalMU ? (summary.totalEnlMU / totalMU) * 100 : 0;
+            const resPercent = totalMU ? (summary.totalResMU / totalMU) * 100 : 0;
+
+            muCard.innerHTML = `
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Cumulative Mind Units</h2>
+                        <p class="panel-caption">Lifetime MU split across recorded cycles.</p>
+                    </div>
+                </div>
+                <div class="mu-bar" aria-hidden="true">
+                    <div class="mu-bar-track">
+                        <div class="mu-segment enl-segment" style="width: ${enlPercent.toFixed(2)}%;"></div>
+                        <div class="mu-segment res-segment" style="width: ${resPercent.toFixed(2)}%;"></div>
+                    </div>
+                </div>
+                <div class="mu-grid">
+                    <section class="stat-box enl-box" aria-label="Enlightened total mind units">
+                        <span class="stat-label">ENL Total</span>
+                        <span class="stat-value">${escapeHtml(formatCompactNumber(summary.totalEnlMU))}</span>
+                        <p class="stat-subtext">${enlPercent.toFixed(1)}% of all MU</p>
+                    </section>
+                    <section class="stat-box res-box" aria-label="Resistance total mind units">
+                        <span class="stat-label">RES Total</span>
+                        <span class="stat-value">${escapeHtml(formatCompactNumber(summary.totalResMU))}</span>
+                        <p class="stat-subtext">${resPercent.toFixed(1)}% of all MU</p>
+                    </section>
+                </div>`;
+
+            clearBusyState(muCard);
+        }
+
         function renderLegend(maxMOV) {
-            const legendContainer = document.getElementById('legend-container');
-            legendContainer.innerHTML = ''; // Clear previous content
+            const levels = [1, 2, 3, 4, 5];
+            const divergingCells = [
+                ...levels.slice().reverse().map((level) => `<span class="scale-cell winner-enl level-${level}" aria-hidden="true"></span>`),
+                '<span class="scale-cell close" aria-hidden="true"></span>',
+                ...levels.map((level) => `<span class="scale-cell winner-res level-${level}" aria-hidden="true"></span>`)
+            ].join('');
 
-            const card = document.createElement('div');
-            card.className = 'w-full max-w-xl mx-auto p-4 bg-white rounded-xl shadow-inner border border-gray-100';
-            
-            const title = document.createElement('h3');
-            title.className = 'text-base font-semibold text-gray-700 mb-2';
-            title.textContent = 'Cycle Winner & Margin of Victory';
-            card.appendChild(title);
-
-            // Two Gradient Bars (ENL and RES)
-            const legendBarsContainer = document.createElement('div');
-            legendBarsContainer.className = 'grid grid-cols-2 gap-4';
-
-            // --- ENL Legend Bar ---
-            const enlBar = createGradientBar('ENL Win', ENL_COLOR_HEX, 'ENL');
-            legendBarsContainer.appendChild(enlBar);
-
-            // --- RES Legend Bar ---
-            const resBar = createGradientBar('RES Win', RES_COLOR_HEX, 'RES');
-            legendBarsContainer.appendChild(resBar);
-
-            card.appendChild(legendBarsContainer);
-
-            // Labels for Margin
-            const labels = document.createElement('div');
-            labels.className = 'flex justify-between text-sm text-gray-600 font-medium mt-2 pt-2 border-t border-gray-100';
-
-            const lowLabel = document.createElement('span');
-            lowLabel.textContent = `Close Battle (~0 MOV / Tie)`;
-            labels.appendChild(lowLabel);
-
-            const maxLabel = document.createElement('span');
-            maxLabel.textContent = `Blowout (${maxMOV.toLocaleString()} MOV)`;
-            labels.appendChild(maxLabel);
-
-            card.appendChild(labels);
-            legendContainer.appendChild(card);
-        }
-        
-        /** Helper function to create a gradient bar element */
-        function createGradientBar(title, targetColor, faction) {
-            const barContainer = document.createElement('div');
-            barContainer.className = 'flex flex-col';
-
-            const barTitle = document.createElement('p');
-            barTitle.className = `text-sm font-bold mb-1 ${faction === 'ENL' ? 'text-green-600' : 'text-blue-600'}`;
-            barTitle.textContent = title;
-            barContainer.appendChild(barTitle);
-
-            const gradientBar = document.createElement('div');
-            gradientBar.className = 'h-5 rounded-md';
-            // Create a CSS linear gradient using the base and target hex codes
-            gradientBar.style.background = `linear-gradient(to right, ${BASE_COLOR_HEX}, ${targetColor})`;
-            barContainer.appendChild(gradientBar);
-            
-            return barContainer;
+            return `
+                <div class="legend-scales">
+                    <div class="scale-row">
+                        <div class="scale-label centered"><span>ENL Blowout</span><span>Close</span><span>RES Blowout</span></div>
+                        <div class="scale-track">
+                            ${divergingCells}
+                        </div>
+                    </div>
+                </div>`;
         }
 
-        // Initialize the application when the window loads
-        window.onload = loadAndRenderHeatmap;
+        function renderHeatmapCell(cycle) {
+            if (!cycle) {
+                return '<span class="empty-cell" aria-hidden="true"></span>';
+            }
+
+            const className = cycle.winner === 'TIE'
+                ? 'heatmap-cell winner-tie'
+                : `heatmap-cell winner-${cycle.winner.toLowerCase()} level-${cycle.intensityLevel}`;
+            const tooltipText = createTooltipText(cycle);
+            const ariaText = tooltipText.replaceAll('\n', ', ');
+            return `<button type="button" class="${className}" aria-label="${escapeHtml(ariaText)}">${createTooltipMarkup(cycle)}</button>`;
+        }
+
+        function renderHeatmapMatrix(years) {
+            const container = document.getElementById('heatmap-container');
+            const cycleNumbers = Array.from({ length: TOTAL_CYCLES }, (_, index) => index + 1);
+
+            const headerCells = cycleNumbers.map((cycleNumber) => {
+                const label = cycleNumber % 5 === 0 || cycleNumber === 1 || cycleNumber === TOTAL_CYCLES
+                    ? String(cycleNumber)
+                    : '·';
+                return `
+                    <th class="matrix-cycle-label" scope="col">
+                        <span aria-hidden="true">${label}</span>
+                        <span class="sr-only">Cycle ${cycleNumber}</span>
+                    </th>`;
+            }).join('');
+
+            const rows = years.map(({ year, cycleLookup, cycles }) => {
+                const cells = cycleNumbers.map((cycleNumber) => `
+                    <td class="matrix-data-cell">${renderHeatmapCell(cycleLookup.get(cycleNumber))}</td>`).join('');
+                return `
+                    <tr aria-label="${year} heatmap row with ${cycles.length} recorded cycles">
+                        <th class="matrix-year-label" scope="row">${year}</th>
+                        ${cells}
+                    </tr>`;
+            }).join('');
+
+            container.innerHTML = `
+                <article class="matrix-panel">
+                    <div class="matrix-header">
+                        <div>
+                            <h2 class="panel-title">Margin of Victory</h2>
+                            <p class="panel-caption">Cycle-by-cycle outcomes.</p>
+                        </div>
+                    </div>
+                    ${renderLegend(years.length ? Math.max(...years.flatMap(({ cycles }) => cycles.map((cycle) => cycle.margin))) : 0)}
+                    <div class="matrix-scroll">
+                        <table class="heatmap-matrix" aria-label="Year by cycle margin of victory heatmap">
+                            <thead>
+                                <tr>
+                                    <th class="matrix-axis-label" scope="col">Year</th>
+                                    ${headerCells}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>`;
+        }
+
+        async function loadAndRenderHeatmap() {
+            const heatmapContainer = document.getElementById('heatmap-container');
+
+            try {
+                const response = await fetch(DATA_FILE);
+                if (!response.ok) {
+                    throw new Error(`Failed to load data: ${response.status} ${response.statusText}`);
+                }
+
+                const rawData = await response.json();
+                if (!Array.isArray(rawData) || !rawData.length) {
+                    throw new Error('JSON payload is empty or not an array.');
+                }
+
+                const model = processData(rawData);
+                renderCycleWinsChart(model.summary);
+                renderSummaryMetrics(model.summary);
+                renderHeatmapMatrix(model.years);
+            } catch (error) {
+                console.error('Initialization error:', error);
+                heatmapContainer.innerHTML = `
+                    <div class="error-state" role="alert">
+                        <p>Unable to load septi-cycle history.</p>
+                        <p class="panel-caption">${escapeHtml(error.message)}</p>
+                    </div>`;
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadAndRenderHeatmap, { once: true });
     </script>
 </body>
 </html>
