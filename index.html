@@ -392,6 +392,37 @@
             height: 100%;
         }
 
+        .streak-bar {
+            height: 0.92rem;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--track);
+        }
+
+        .streak-bar-track {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .streak-segment {
+            height: 100%;
+            min-width: 0.2rem;
+        }
+
+        .streak-segment.enl-segment {
+            background: linear-gradient(90deg, var(--enl-3), var(--enl-5));
+        }
+
+        .streak-segment.res-segment {
+            background: linear-gradient(90deg, var(--res-3), var(--res-5));
+        }
+
+        .streak-segment.tie-segment {
+            background: var(--tie-1);
+        }
+
         .mu-segment.enl-segment {
             background: linear-gradient(90deg, var(--enl-3), var(--enl-5));
         }
@@ -988,11 +1019,32 @@
             let longestResStreak = 0;
             let currentEnlStreak = 0;
             let currentResStreak = 0;
+            const streakRuns = [];
+            let activeStreakWinner = null;
+            let activeStreakLength = 0;
+
+            function pushActiveStreak() {
+                if (!activeStreakWinner || activeStreakLength <= 0) {
+                    return;
+                }
+
+                streakRuns.push({
+                    winner: activeStreakWinner,
+                    length: activeStreakLength
+                });
+            }
 
             const cycles = cleanData.map((row) => {
                 const winner = getWinner(row.enl, row.res);
                 const margin = Math.abs(row.enl - row.res);
                 const intensityLevel = winner === 'TIE' ? 0 : getIntensityLevel(margin, maxMOV);
+
+                if (winner !== activeStreakWinner) {
+                    pushActiveStreak();
+                    activeStreakWinner = winner;
+                    activeStreakLength = 0;
+                }
+                activeStreakLength += 1;
 
                 totalEnlMU += row.enl;
                 totalResMU += row.res;
@@ -1027,6 +1079,8 @@
                 };
             });
 
+            pushActiveStreak();
+
             longestEnlStreak = Math.max(longestEnlStreak, currentEnlStreak);
             longestResStreak = Math.max(longestResStreak, currentResStreak);
 
@@ -1060,7 +1114,8 @@
                     totalEnlMU,
                     totalResMU,
                     longestEnlStreak,
-                    longestResStreak
+                    longestResStreak,
+                    streakRuns
                 }
             };
         }
@@ -1126,6 +1181,17 @@
         function renderSummaryMetrics(summary) {
             const streakCard = document.getElementById('longest-streak-card');
             const muCard = document.getElementById('cumulative-mu-card');
+            const totalStreakCycles = summary.longestEnlStreak + summary.longestResStreak;
+            const enlStreakPercent = totalStreakCycles ? (summary.longestEnlStreak / totalStreakCycles) * 100 : 0;
+            const resStreakPercent = totalStreakCycles ? (summary.longestResStreak / totalStreakCycles) * 100 : 0;
+            const streakSegments = summary.streakRuns.map((run) => {
+                const segmentClass = run.winner === 'TIE'
+                    ? 'streak-segment tie-segment'
+                    : `streak-segment ${run.winner.toLowerCase()}-segment`;
+                const label = run.winner === 'TIE' ? 'Tie' : run.winner;
+                const width = (run.length / summary.totalCycles) * 100;
+                return `<div class="${segmentClass}" style="width: ${width.toFixed(2)}%;" title="${label} streak: ${numberFormatter.format(run.length)} cycles"></div>`;
+            }).join('');
 
             streakCard.innerHTML = `
                 <div class="panel-header">
@@ -1134,16 +1200,21 @@
                         <p class="panel-caption">Most consecutive septi-cycles won by each faction.</p>
                     </div>
                 </div>
+                <div class="streak-bar" aria-hidden="true">
+                    <div class="streak-bar-track">
+                        ${streakSegments}
+                    </div>
+                </div>
                 <div class="metric-grid">
                     <section class="stat-box enl-box" aria-label="Enlightened longest streak">
                         <span class="stat-label">ENL Streak</span>
                         <span class="stat-value">${numberFormatter.format(summary.longestEnlStreak)}</span>
-                        <p class="stat-subtext">cycles</p>
+                        <p class="stat-subtext">${enlStreakPercent.toFixed(1)}% of combined longest streaks</p>
                     </section>
                     <section class="stat-box res-box" aria-label="Resistance longest streak">
                         <span class="stat-label">RES Streak</span>
                         <span class="stat-value">${numberFormatter.format(summary.longestResStreak)}</span>
-                        <p class="stat-subtext">cycles</p>
+                        <p class="stat-subtext">${resStreakPercent.toFixed(1)}% of combined longest streaks</p>
                     </section>
                 </div>`;
 
