@@ -1330,6 +1330,36 @@
                 </div>`;
         }
 
+        function scheduleLowPriorityTask(task) {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(task, { timeout: 250 });
+            } else {
+                setTimeout(task, 50);
+            }
+        }
+
+        function observeHeatmapVisibility(model) {
+            const heatmapContainer = document.getElementById('heatmap-container');
+
+            if (!window.IntersectionObserver) {
+                renderHeatmapMatrix(model.years, model.maxMOV);
+                return;
+            }
+
+            const observer = new IntersectionObserver((entries, obs) => {
+                if (!entries.some((entry) => entry.isIntersecting)) {
+                    return;
+                }
+
+                renderHeatmapMatrix(model.years, model.maxMOV);
+                obs.disconnect();
+            }, {
+                rootMargin: '400px'
+            });
+
+            observer.observe(heatmapContainer);
+        }
+
         function renderHeatmapCell(cycle, cycleNumber, rowIndex) {
             if (!cycle) {
                 return '<span class="empty-cell" aria-hidden="true"></span>';
@@ -1354,7 +1384,7 @@
             return `<button type="button" class="${className}" aria-label="${escapeHtml(ariaText)}">${createTooltipMarkup(cycle, tooltipClasses.join(' '))}</button>`;
         }
 
-        function renderHeatmapMatrix(years) {
+        function renderHeatmapMatrix(years, maxMOV) {
             const container = document.getElementById('heatmap-container');
             const cycleNumbers = Array.from({ length: TOTAL_CYCLES }, (_, index) => index + 1);
 
@@ -1387,7 +1417,7 @@
                             <p class="panel-caption">Cycle-by-cycle outcomes.</p>
                         </div>
                     </div>
-                    ${renderLegend(years.length ? Math.max(...years.flatMap(({ cycles }) => cycles.map((cycle) => cycle.margin))) : 0)}
+                    ${renderLegend(maxMOV)}
                     <div class="matrix-scroll">
                         <table class="heatmap-matrix" aria-label="Year by cycle margin of victory heatmap">
                             <thead>
@@ -1421,7 +1451,7 @@
                 const model = processData(rawData);
                 renderCycleWinsChart(model.summary);
                 renderSummaryMetrics(model.summary);
-                renderHeatmapMatrix(model.years);
+                scheduleLowPriorityTask(() => observeHeatmapVisibility(model));
             } catch (error) {
                 console.error('Initialization error:', error);
                 heatmapContainer.innerHTML = `
