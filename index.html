@@ -860,7 +860,7 @@
         </noscript>
     </main>
 
-    <script>
+    <script data-cfasync="false">
         const DATA_FILE = 'am01-echo-09.json';
         const TOTAL_CYCLES = 51;
         const numberFormatter = new Intl.NumberFormat('en-US');
@@ -1292,7 +1292,11 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', loadAndRenderHeatmap, { once: true });
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', loadAndRenderHeatmap, { once: true });
+        } else {
+            loadAndRenderHeatmap();
+        }
     </script>
 </body>
 </html>
